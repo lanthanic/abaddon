@@ -99,11 +99,19 @@ std::string Platform::FindResourceFolder() {
     static bool found = false;
     if (found) return found_path;
 
-    const auto home_env = std::getenv("HOME");
-    if (home_env != nullptr) {
-        const static std::string home_path = home_env + "/.local/share/abaddon"s;
+    std::string abaddon_dir = "";
+    const auto xdg_state_env = std::getenv("XDG_STATE_HOME");
 
-        for (const auto &path : { "."s, home_path, std::string(ABADDON_DEFAULT_RESOURCE_DIR) }) {
+    if (xdg_state_env != nullptr) {
+        abaddon_dir = xdg_state_env + "/abaddon"s;
+    } else {
+        const auto home_env = std::getenv("HOME");
+        if (home_env != nullptr)
+            abaddon_dir = home_env + "/.local/share/abaddon"s;
+    }
+
+    if (!abaddon_dir.empty()) {
+        for (const auto &path : { "."s, abaddon_dir, std::string(ABADDON_DEFAULT_RESOURCE_DIR) }) {
             if (util::IsFolder(path + "/res") && util::IsFolder(path + "/css")) {
                 found_path = path;
                 found = true;
@@ -126,19 +134,29 @@ std::string Platform::FindConfigFile() {
     if (util::IsFile("./abaddon.ini"))
         return "./abaddon.ini";
 
-    if (const auto home_env = std::getenv("HOME")) {
-        // use ~/.config if present
-        if (auto home_path = home_env + "/.config/abaddon/abaddon.ini"s; util::IsFile(home_path)) {
-            return home_path;
+    std::string abaddon_cfg_path = "";
+    const auto xdg_config_env = std::getenv("XDG_CONFIG_HOME");
+
+    if (xdg_config_env != nullptr) {
+        abaddon_cfg_path = xdg_config_env + "/abaddon"s;
+    } else {
+        const auto home_env = std::getenv("HOME");
+        if (home_env != nullptr)
+            abaddon_cfg_path = home_env + "/.config/abaddon"s;
+    }
+
+    if (!abaddon_cfg_path.empty()) {
+        if (util::IsFile(abaddon_cfg_path + "/abaddon.ini"s)) {
+            return abaddon_cfg_path + "/abaddon.ini"s;
         }
 
-        // fallback to ~/.config if the directory exists/can be created
         std::error_code ec;
-        const auto home_path = home_env + "/.config/abaddon"s;
-        if (!util::IsFolder(home_path))
-            std::filesystem::create_directories(home_path, ec);
-        if (util::IsFolder(home_path))
-            return home_path + "/abaddon.ini";
+        if (!util::IsFolder(abaddon_cfg_path)) {
+            std::filesystem::create_directories(abaddon_cfg_path, ec);
+        }
+
+        if (util::IsFolder(abaddon_cfg_path))
+            return abaddon_cfg_path + "/abaddon.ini"s;
     }
 
     // fallback to cwd if cant find + cant make in ~/.config
@@ -147,15 +165,25 @@ std::string Platform::FindConfigFile() {
 }
 
 std::string Platform::FindStateCacheFolder() {
-    const auto home_env = std::getenv("HOME");
-    if (home_env != nullptr) {
-        auto home_path = home_env + "/.cache/abaddon"s;
-        std::error_code ec;
-        if (!util::IsFolder(home_path))
-            std::filesystem::create_directories(home_path, ec);
-        if (util::IsFolder(home_path))
-            return home_path;
+    std::string abaddon_cache = "";
+    const auto xdg_cache_env = std::getenv("XDG_CACHE_HOME");
+
+    if (xdg_cache_env != nullptr) {
+        abaddon_cache = xdg_cache_env + "/abaddon"s;
+    } else {
+        const auto home_env = std::getenv("HOME");
+        if (home_env != nullptr)
+            abaddon_cache = home_env + "/.cache/abaddon"s;
     }
+
+    if (!abaddon_cache.empty()) {
+        std::error_code ec;
+        if (!util::IsFolder(abaddon_cache))
+            std::filesystem::create_directories(abaddon_cache, ec);
+        if (util::IsFolder(abaddon_cache))
+            return abaddon_cache;
+    }
+
     spdlog::get("discord")->warn("can't find cache folder!");
     return ".";
 }
